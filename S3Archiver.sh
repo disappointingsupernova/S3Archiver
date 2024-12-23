@@ -63,13 +63,36 @@ if [[ -z "$BASE_DIR" || -z "$S3_BUCKET" ]]; then
     exit 1
 fi
 
+# Upload to S3
+upload_to_s3() {
+    local file="$1"
+    local s3_path="$S3_BUCKET"
+    
+    # Ensure the S3 path starts with "s3://"
+    if [[ ! "$s3_path" =~ ^s3:// ]]; then
+        s3_path="s3://$s3_path"
+    fi
+
+    echo "Uploading $file to $s3_path..."
+    aws s3 cp "$file" "$s3_path" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Upload failed for $file."
+        exit 1
+    fi
+
+    # Remove uploaded file
+    rm -f "$file"
+    echo "$file uploaded and deleted locally."
+}
+
+
 # Compress and encrypt function
 process_folder() {
     local folder="$1"
     echo "Processing folder: $folder"
 
     # Find all files in the current folder
-    files=$(find "$folder" -maxdepth 1 -type f -print0)
+    files=$(find "$folder" -maxdepth 1 -type f)
     if [[ -z "$files" ]]; then
         echo "No files found in $folder. Skipping."
         return
@@ -119,17 +142,9 @@ process_folder() {
     esac
 
     # Upload to S3
-    echo "Uploading $archive_name to S3..."
-    aws s3 cp "$archive_name" "$S3_BUCKET" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Upload failed for $archive_name."
-        exit 1
-    fi
-
-    # Remove uploaded file
-    rm -f "$archive_name"
-    echo "$archive_name uploaded and deleted locally."
+    upload_to_s3 "$archive_name"
 }
+
 
 # Recursively process each subfolder
 find "$BASE_DIR" -type d | while read -r folder; do
