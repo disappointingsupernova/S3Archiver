@@ -12,7 +12,6 @@ S3_FOLDER="" # Optional S3 folder name
 AWS_PROFILE="default" # AWS profile name
 STORAGE_CLASS="DEEP_ARCHIVE" # Default storage class
 DRY_RUN=false # Default to false
-THREADS=1 # Default number of threads for compression
 
 # Install required packages function
 install_packages() {
@@ -40,13 +39,12 @@ show_help() {
     echo "  -f <s3_folder>         S3 folder path (optional)"
     echo "  -a <aws_profile>       AWS CLI profile"
     echo "  -l <storage_class>     S3 storage class"
-    echo "  -t <threads>           Number of threads for compression"
     echo "  -d                     Dry run (counts folders and archives without processing)"
     echo "  -h                     Show this help message"
 }
 
 # Parse CLI options
-while getopts "b:o:k:e:p:c:s:f:a:l:t:dh" opt; do
+while getopts "b:o:k:e:p:c:s:f:a:l:dh" opt; do
     case $opt in
         b) BASE_DIR="$OPTARG" ;;
         o) OUTPUT_BASE_DIR="$OPTARG" ;;
@@ -58,7 +56,6 @@ while getopts "b:o:k:e:p:c:s:f:a:l:t:dh" opt; do
         f) S3_FOLDER="$OPTARG" ;;
         a) AWS_PROFILE="$OPTARG" ;;
         l) STORAGE_CLASS="$OPTARG" ;;
-        t) THREADS="$OPTARG" ;;
         d) DRY_RUN=true ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
