@@ -128,9 +128,12 @@ process_folder() {
         *) echo "Error: Unsupported encryption type: $ENCRYPTION_TYPE"; exit 1 ;;
     esac
 
+    # Ensure folder structure in S3
+    s3_path="$S3_BUCKET${relative_path}/"
+
     # Upload to S3
-    echo "Uploading $archive_name to S3..."
-    aws s3 cp "$archive_name" "$S3_BUCKET" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
+    echo "Uploading $archive_name to $s3_path..."
+    aws s3 cp "$archive_name" "$s3_path" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
     if [[ $? -ne 0 ]]; then
         echo "Error: Upload failed for $archive_name."
         exit 1
