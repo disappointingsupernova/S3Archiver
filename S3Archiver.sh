@@ -110,6 +110,7 @@ process_folder() {
 
     # Determine output folder
     relative_path="${folder#$BASE_DIR}" # Remove BASE_DIR from folder path
+    relative_path="/${relative_path#/}" # Ensure leading slash is correct
     output_folder="$OUTPUT_BASE_DIR$relative_path"
     mkdir -p "$output_folder"
 
@@ -152,7 +153,7 @@ process_folder() {
     esac
 
     # Ensure folder structure in S3
-    s3_path="$S3_BUCKET${relative_path}/"
+    s3_path="$S3_BUCKET$relative_path/"
 
     # Upload to S3
     echo "Uploading $archive_name to $s3_path..."
