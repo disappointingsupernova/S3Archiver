@@ -11,6 +11,7 @@ S3_BUCKET="" # S3 bucket name
 S3_FOLDER="" # Optional S3 folder name
 AWS_PROFILE="default" # AWS profile name
 STORAGE_CLASS="DEEP_ARCHIVE" # Default storage class
+DRY_RUN=false # Default to false
 
 # Install required packages function
 install_packages() {
@@ -38,11 +39,12 @@ show_help() {
     echo "  -f <s3_folder>         S3 folder path (optional)"
     echo "  -a <aws_profile>       AWS CLI profile"
     echo "  -l <storage_class>     S3 storage class"
+    echo "  -d                     Dry run (counts folders and archives without processing)"
     echo "  -h                     Show this help message"
 }
 
 # Parse CLI options
-while getopts "b:o:k:e:p:c:s:f:a:l:h" opt; do
+while getopts "b:o:k:e:p:c:s:f:a:l:dh" opt; do
     case $opt in
         b) BASE_DIR="$OPTARG" ;;
         o) OUTPUT_BASE_DIR="$OPTARG" ;;
@@ -54,6 +56,7 @@ while getopts "b:o:k:e:p:c:s:f:a:l:h" opt; do
         f) S3_FOLDER="$OPTARG" ;;
         a) AWS_PROFILE="$OPTARG" ;;
         l) STORAGE_CLASS="$OPTARG" ;;
+        d) DRY_RUN=true ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
     esac
@@ -71,6 +74,26 @@ if [[ -n "$S3_FOLDER" ]]; then
     S3_BUCKET="s3://$S3_BUCKET/$S3_FOLDER"
 else
     S3_BUCKET="s3://$S3_BUCKET"
+fi
+
+# Dry run logic
+if $DRY_RUN; then
+    echo "Performing dry run..."
+    folder_count=0
+    archive_count=0
+
+    while read -r folder; do
+        ((folder_count++))
+        file_count=$(find "$folder" -maxdepth 1 -type f | wc -l)
+        if [[ $file_count -gt 0 ]]; then
+            ((archive_count++))
+        fi
+    done < <(find "$BASE_DIR" -type d)
+
+    echo "Dry run complete:"
+    echo "Folders processed: $folder_count"
+    echo "Archives to be created: $archive_count"
+    exit 0
 fi
 
 # Compress and encrypt function
