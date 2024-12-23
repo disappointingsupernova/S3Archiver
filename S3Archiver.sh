@@ -5,13 +5,14 @@ BASE_DIR="" # Will be set via CLI
 OUTPUT_BASE_DIR="/tmp/archive_$(date +%s)" # Default output directory
 GPG_KEY="" # GPG key for encryption
 ARCHIVE_SUFFIX=".tar.zst.gpg" # Default suffix
-COMPRESS_TYPE="zstd" # Compression type (zstd/tz)
+COMPRESS_TYPE="zstd" # Compression type (zstd/tz/none)
 ENCRYPTION_TYPE="gpg" # Encryption type (gpg/aes256/none)
 S3_BUCKET="" # S3 bucket name
 S3_FOLDER="" # Optional S3 folder name
 AWS_PROFILE="default" # AWS profile name
 STORAGE_CLASS="DEEP_ARCHIVE" # Default storage class
 DRY_RUN=false # Default to false
+THREADS=1 # Default number of threads for compression
 
 # Install required packages function
 install_packages() {
@@ -34,17 +35,18 @@ show_help() {
     echo "  -k <gpg_key>           GPG key ID or email for encryption"
     echo "  -e <encryption_type>   Encryption type: gpg, aes256, none"
     echo "  -p <aes_passphrase>    Passphrase for AES256 encryption"
-    echo "  -c <compress_type>     Compression type: zstd, tz"
+    echo "  -c <compress_type>     Compression type: zstd, tz, none"
     echo "  -s <s3_bucket>         S3 bucket name"
     echo "  -f <s3_folder>         S3 folder path (optional)"
     echo "  -a <aws_profile>       AWS CLI profile"
     echo "  -l <storage_class>     S3 storage class"
+    echo "  -t <threads>           Number of threads for compression"
     echo "  -d                     Dry run (counts folders and archives without processing)"
     echo "  -h                     Show this help message"
 }
 
 # Parse CLI options
-while getopts "b:o:k:e:p:c:s:f:a:l:dh" opt; do
+while getopts "b:o:k:e:p:c:s:f:a:l:t:dh" opt; do
     case $opt in
         b) BASE_DIR="$OPTARG" ;;
         o) OUTPUT_BASE_DIR="$OPTARG" ;;
@@ -56,6 +58,7 @@ while getopts "b:o:k:e:p:c:s:f:a:l:dh" opt; do
         f) S3_FOLDER="$OPTARG" ;;
         a) AWS_PROFILE="$OPTARG" ;;
         l) STORAGE_CLASS="$OPTARG" ;;
+        t) THREADS="$OPTARG" ;;
         d) DRY_RUN=true ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
@@ -123,6 +126,7 @@ process_folder() {
     case "$COMPRESS_TYPE" in
         zstd) archive_name+=".tar.zst"; tar --zstd -cf "$archive_name" --null --files-from="$file_list" ;;
         tz) archive_name+=".tar.gz"; tar -czf "$archive_name" --null --files-from="$file_list" ;;
+        none) archive_name+=".tar"; tar -cf "$archive_name" --null --files-from="$file_list" ;;
         *) echo "Error: Unsupported compression type: $COMPRESS_TYPE"; exit 1 ;;
     esac
 
