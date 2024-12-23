@@ -132,7 +132,6 @@ process_folder() {
 
     rm -f "$file_list"
 
-    # Encrypt the archive
     case "$ENCRYPTION_TYPE" in
         gpg)
             if [[ -z "$GPG_KEY" ]]; then
@@ -152,9 +151,14 @@ process_folder() {
             rm -f "$archive_name"
             archive_name+=".enc"
             ;;
-        none) ;; # No encryption
-        *) echo "Error: Unsupported encryption type: $ENCRYPTION_TYPE"; exit 1 ;;
-    esac
+        none)
+            echo "Skipping encryption for $archive_name."
+            ;;
+        *)
+            echo "Error: Unsupported encryption type: $ENCRYPTION_TYPE"
+            exit 1
+            ;;
+esac
 
     # Ensure folder structure in S3
     s3_path="$S3_BUCKET$relative_path/"
