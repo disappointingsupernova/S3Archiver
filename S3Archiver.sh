@@ -2,12 +2,13 @@
 
 # Default Variables
 BASE_DIR="" # Will be set via CLI
-OUTPUT_BASE_DIR="" # Default output directory
+OUTPUT_BASE_DIR="/tmp/archive_$(date +%s)" # Default output directory
 GPG_KEY="" # GPG key for encryption
 ARCHIVE_SUFFIX=".tar.zst.gpg" # Default suffix
 COMPRESS_TYPE="zstd" # Compression type (zstd/tz)
 ENCRYPTION_TYPE="gpg" # Encryption type (gpg/aes256/none)
 S3_BUCKET="" # S3 bucket name
+S3_FOLDER="" # Optional S3 folder name
 AWS_PROFILE="default" # AWS profile name
 STORAGE_CLASS="DEEP_ARCHIVE" # Default storage class
 
@@ -34,13 +35,14 @@ show_help() {
     echo "  -p <aes_passphrase>    Passphrase for AES256 encryption"
     echo "  -c <compress_type>     Compression type: zstd, tz"
     echo "  -s <s3_bucket>         S3 bucket name"
+    echo "  -f <s3_folder>         S3 folder path (optional)"
     echo "  -a <aws_profile>       AWS CLI profile"
     echo "  -l <storage_class>     S3 storage class"
     echo "  -h                     Show this help message"
 }
 
 # Parse CLI options
-while getopts "b:o:k:e:p:c:s:a:l:h" opt; do
+while getopts "b:o:k:e:p:c:s:f:a:l:h" opt; do
     case $opt in
         b) BASE_DIR="$OPTARG" ;;
         o) OUTPUT_BASE_DIR="$OPTARG" ;;
@@ -49,6 +51,7 @@ while getopts "b:o:k:e:p:c:s:a:l:h" opt; do
         p) AES_PASSPHRASE="$OPTARG" ;;
         c) COMPRESS_TYPE="$OPTARG" ;;
         s) S3_BUCKET="$OPTARG" ;;
+        f) S3_FOLDER="$OPTARG" ;;
         a) AWS_PROFILE="$OPTARG" ;;
         l) STORAGE_CLASS="$OPTARG" ;;
         h) show_help; exit 0 ;;
@@ -63,28 +66,12 @@ if [[ -z "$BASE_DIR" || -z "$S3_BUCKET" ]]; then
     exit 1
 fi
 
-# Upload to S3
-upload_to_s3() {
-    local file="$1"
-    local s3_path="$S3_BUCKET"
-    
-    # Ensure the S3 path starts with "s3://"
-    if [[ ! "$s3_path" =~ ^s3:// ]]; then
-        s3_path="s3://$s3_path"
-    fi
-
-    echo "Uploading $file to $s3_path..."
-    aws s3 cp "$file" "$s3_path" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Upload failed for $file."
-        exit 1
-    fi
-
-    # Remove uploaded file
-    rm -f "$file"
-    echo "$file uploaded and deleted locally."
-}
-
+# Set S3 path with optional folder
+if [[ -n "$S3_FOLDER" ]]; then
+    S3_BUCKET="s3://$S3_BUCKET/$S3_FOLDER"
+else
+    S3_BUCKET="s3://$S3_BUCKET"
+fi
 
 # Compress and encrypt function
 process_folder() {
@@ -92,7 +79,7 @@ process_folder() {
     echo "Processing folder: $folder"
 
     # Find all files in the current folder
-    files=$(find "$folder" -maxdepth 1 -type f)
+    files=$(find "$folder" -maxdepth 1 -type f -print0)
     if [[ -z "$files" ]]; then
         echo "No files found in $folder. Skipping."
         return
@@ -142,9 +129,17 @@ process_folder() {
     esac
 
     # Upload to S3
-    upload_to_s3 "$archive_name"
-}
+    echo "Uploading $archive_name to S3..."
+    aws s3 cp "$archive_name" "$S3_BUCKET" --profile "$AWS_PROFILE" --storage-class "$STORAGE_CLASS"
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Upload failed for $archive_name."
+        exit 1
+    fi
 
+    # Remove uploaded file
+    rm -f "$archive_name"
+    echo "$archive_name uploaded and deleted locally."
+}
 
 # Recursively process each subfolder
 find "$BASE_DIR" -type d | while read -r folder; do
